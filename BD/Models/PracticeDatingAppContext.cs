@@ -239,7 +239,7 @@ public partial class PracticeDatingAppContext : DbContext
                 .HasMaxLength(50)
                 .HasColumnName("login");
             entity.Property(e => e.Password)
-                .HasMaxLength(50)
+                .HasMaxLength(500)
                 .HasColumnName("password");
         });
 
