@@ -11,11 +11,11 @@ namespace Server.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class AuthoController : ControllerBase
+    public class RegistrationController : ControllerBase
     {
         private readonly PracticeDatingAppContext _context;
 
-        public AuthoController(PracticeDatingAppContext context)
+        public RegistrationController(PracticeDatingAppContext context)
         {
             _context = context;
         }
