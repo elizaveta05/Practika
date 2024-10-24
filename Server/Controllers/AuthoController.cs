@@ -5,6 +5,7 @@ using Server.Model.Model_users;
 using BCrypt.Net;
 using System.Threading.Tasks;
 using makets.Model.Model_users;
+using System;
 
 namespace Server.Controllers
 {
@@ -61,7 +62,7 @@ namespace Server.Controllers
 
         //Создание записи в таблице DataUser
         [HttpPost("newDataUser")]
-        public async Task<IActionResult> CreateNewDataUser([FromBody] Datauser newUser)
+        public async Task<IActionResult> CreateNewDataUser([FromBody] DataUser newUser)
         {
             // Проверка наличия внешних ключей
             var genderExists = await _context.Genders.AnyAsync(g => g.GenderId == newUser.GenderId);
@@ -82,38 +83,35 @@ namespace Server.Controllers
                 return BadRequest("Некорректный идентификатор регистрации пользователя.");
             }
 
-            // Получаем максимальный UserId и создаем новый
+            
+            // Создаем новую запись в таблице
             var maxUserId = await _context.Datausers.MaxAsync(u => (int?)u.UserId) ?? 0;
             newUser.UserId = maxUserId + 1;
 
-            // Проверка на наличие пользователя с таким ID
-            var existingUser = await _context.Datausers.FirstOrDefaultAsync(u => u.UserId == newUser.UserId);
-            if (existingUser != null)
+            var newdataUser = new Datauser
             {
-                return BadRequest("Пользователь с таким идентификатором уже существует.");
-            }
-
-            // Добавляем новую запись в контекст
-            _context.Datausers.Add(newUser);
-
-            // Сохранение изменений в базе данных
+                UserId = newUser.UserId,
+                LastName = newUser.LastName,
+                FirstName = newUser.FirstName,
+                Patronymic = newUser.Patronymic,
+                DateOfBirth = newUser.DateOfBirth,
+                GenderId = newUser.GenderId,
+                LocationId = newUser.LocationId,
+                UdrId = newUser.UdrId
+            };
+            _context.Datausers.Add(newdataUser);
             await _context.SaveChangesAsync();
 
             return Ok(new { userId = newUser.UserId });
         }
 
-        public class SaveUserTagsRequest
-        {
-            public List<int> TagIds { get; set; }
-            public int UserId { get; set; }
-        }
 
         [HttpPost("saveUserTags")]
         public async Task<IActionResult> SaveUserTags([FromBody] SaveUserTagsRequest request)
         {
             if (request.TagIds == null || !request.TagIds.Any())
             {
-                return BadRequest("No tags provided.");
+                return BadRequest("Теги не указаны.");
             }
 
             // Проверяем, существует ли пользователь
@@ -148,6 +146,46 @@ namespace Server.Controllers
 
             return Ok(new { message = "Пользовательские теги сохранены." });
         }
+
+        [HttpPost("saveUserGoal")]
+        public async Task<IActionResult> SaveUserGoal([FromBody] UserGoals request)
+        {
+            if (request.GoalId == 0)
+            {
+                return BadRequest("Цель не указана.");
+            }
+
+            // Проверяем, существует ли пользователь
+            var userExists = await _context.Datausers.AnyAsync(u => u.UserId == request.UserId);
+            if (!userExists)
+            {
+                return NotFound("Пользователь с таким id не существует");
+            }
+
+            // Удаляем старую цель пользователя
+            var existingUserGoal = await _context.Usergoals.FirstOrDefaultAsync(ug => ug.UserId == request.UserId);
+            if (existingUserGoal != null)
+            {
+                _context.Usergoals.Remove(existingUserGoal);
+            }
+
+            // Получаем максимальный UgId и создаем новую цель
+            var maxUgId = await _context.Usergoals.MaxAsync(u => (int?)u.UgId) ?? 0;
+            var newUgId = maxUgId + 1;
+
+            var userGoal = new Usergoal
+            {
+                UgId = newUgId,
+                UserId = request.UserId,
+                GoalId = request.GoalId
+            };
+
+            _context.Usergoals.Add(userGoal);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Цель пользователя сохранена." });
+        }
+
 
 
 

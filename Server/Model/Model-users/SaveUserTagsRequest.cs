@@ -8,14 +8,10 @@ using System.ComponentModel.DataAnnotations;
 
 namespace makets.Model.Model_users;
 
-public partial class UserTags
+public partial class SaveUserTagsRequest
 {
-    [Required]
     public int UiId { get; set; }
 
-    [Required]
+    public List<int> TagIds { get; set; }
     public int UserId { get; set; }
-
-    [Required]
-    public int TagId { get; set; }
 }
