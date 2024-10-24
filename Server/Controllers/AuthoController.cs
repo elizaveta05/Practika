@@ -4,6 +4,7 @@ using BD.Models;
 using Server.Model.Model_users;
 using BCrypt.Net;
 using System.Threading.Tasks;
+using makets.Model.Model_users;
 
 namespace Server.Controllers
 {
@@ -18,6 +19,7 @@ namespace Server.Controllers
             _context = context;
         }
 
+        //Регистрация пользователя в таблицу UserDataRegister
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] UserDataRegister user)
         {
@@ -46,6 +48,7 @@ namespace Server.Controllers
             return Ok(new { userId = newUserId });
         }
 
+        //Возвращения списка городов
         [HttpGet("cities")]
         public async Task<IActionResult> GetCities()
         {
@@ -56,31 +59,11 @@ namespace Server.Controllers
             return Ok(cities);
         }
 
+        //Создание записи в таблице DataUser
         [HttpPost("newDataUser")]
         public async Task<IActionResult> CreateNewDataUser([FromBody] Datauser newUser)
         {
-            if (newUser == null)
-            {
-                return BadRequest("Некорректные данные.");
-            }
-
-            // Проверка обязательных данных
-            if (newUser.GenderId <= 0)
-            {
-                return BadRequest("Пол пользователя обязателен.");
-            }
-
-            if (newUser.LocationId <= 0)
-            {
-                return BadRequest("Местоположение пользователя обязательно.");
-            }
-
-            if (newUser.UdrId <= 0)
-            {
-                return BadRequest("ID пользователя обязателен.");
-            }
-
-            // Проверка наличия внешних ключей в базе данных
+            // Проверка наличия внешних ключей
             var genderExists = await _context.Genders.AnyAsync(g => g.GenderId == newUser.GenderId);
             if (!genderExists)
             {
@@ -101,19 +84,72 @@ namespace Server.Controllers
 
             // Получаем максимальный UserId и создаем новый
             var maxUserId = await _context.Datausers.MaxAsync(u => (int?)u.UserId) ?? 0;
-            newUser.UserId = maxUserId + 1; // Увеличиваем на 1 для нового ID
+            newUser.UserId = maxUserId + 1;
 
+            // Проверка на наличие пользователя с таким ID
             var existingUser = await _context.Datausers.FirstOrDefaultAsync(u => u.UserId == newUser.UserId);
             if (existingUser != null)
             {
                 return BadRequest("Пользователь с таким идентификатором уже существует.");
             }
 
+            // Добавляем новую запись в контекст
             _context.Datausers.Add(newUser);
+
+            // Сохранение изменений в базе данных
             await _context.SaveChangesAsync();
 
-            return Ok(new { message = "Пользователь успешно создан." });
+            return Ok(new { userId = newUser.UserId });
         }
+
+        public class SaveUserTagsRequest
+        {
+            public List<int> TagIds { get; set; }
+            public int UserId { get; set; }
+        }
+
+        [HttpPost("saveUserTags")]
+        public async Task<IActionResult> SaveUserTags([FromBody] SaveUserTagsRequest request)
+        {
+            if (request.TagIds == null || !request.TagIds.Any())
+            {
+                return BadRequest("No tags provided.");
+            }
+
+            // Проверяем, существует ли пользователь
+            var userExists = await _context.Datausers.AnyAsync(u => u.UserId == request.UserId);
+            if (!userExists)
+            {
+                return NotFound("Пользователь с таким id не существует");
+            }
+
+            // Удаляем старые теги пользователя
+            var existingUserTags = await _context.Userinterests.Where(ut => ut.UserId == request.UserId).ToListAsync();
+            _context.Userinterests.RemoveRange(existingUserTags);
+
+            // Получаем максимальный UiId и создаем новый
+            var maxUiId = await _context.Userinterests.MaxAsync(u => (int?)u.UiId) ?? 0;
+
+            // Добавляем новые теги
+            foreach (var tagId in request.TagIds)
+            {
+                var newUiId = ++maxUiId;
+                var userTag = new Userinterest
+                {
+                    UiId = newUiId,
+                    UserId = request.UserId,
+                    TagId = tagId
+                };
+                _context.Userinterests.Add(userTag);
+            }
+
+            // Сохраняем изменения
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Пользовательские теги сохранены." });
+        }
+
+
 
     }
 }
