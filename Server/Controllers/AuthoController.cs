@@ -186,7 +186,37 @@ namespace Server.Controllers
             return Ok(new { message = "Цель пользователя сохранена." });
         }
 
+        [HttpPost("saveUserDescription")]
+        public async Task<IActionResult> SaveUserDescription([FromBody] UserDescription request)
+        {
+            if (request.Description == null)
+            {
+                return BadRequest("Описания нет.");
+            }
 
+            // Проверяем, существует ли пользователь
+            var userExists = await _context.Datausers.AnyAsync(u => u.UserId == request.UserId);
+            if (!userExists)
+            {
+                return NotFound("Пользователь с таким id не существует");
+            }
+
+            // Получаем максимальный UgId и создаем новую цель
+            var maxUgId = await _context.Userdescriptions.MaxAsync(u => (int?)u.UdId) ?? 0;
+            var newUgId = maxUgId + 1;
+
+            var userDescription = new Userdescription
+            {
+                UdId = newUgId,
+                UserId = request.UserId,
+                Description = request.Description
+            };
+
+            _context.Userdescriptions.Add(userDescription);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Описание пользователя сохранено." });
+        }
 
 
     }

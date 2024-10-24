@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using BD.Models;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Server.Controllers
@@ -7,5 +8,14 @@ namespace Server.Controllers
     [ApiController]
     public class UsersController : ControllerBase
     {
+        private readonly PracticeDatingAppContext _context;
+
+        public UsersController(PracticeDatingAppContext context)
+        {
+            _context = context;
+        }
+
+
+
     }
 }
