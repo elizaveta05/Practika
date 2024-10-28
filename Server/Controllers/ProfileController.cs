@@ -188,7 +188,81 @@ namespace Server.Controllers
             return Ok(userGoalId);
         }
 
+        [HttpPost("getUserDescription")]
+        public async Task<IActionResult> GetUserDescription([FromBody] int userId)
+        {
+            // Проверяем, указан ли UserId
+            if (userId <= 0)
+            {
+                return BadRequest("Некорректный идентификатор пользователя.");
+            }
 
+            // Проверяем, существует ли пользователь
+            var userExists = await _context.Datausers.AnyAsync(u => u.UserId == userId);
+            if (!userExists)
+            {
+                return NotFound("Пользователь с таким id не существует.");
+            }
+
+            // Получаем описание пользователя
+            var userDescription = await _context.Userdescriptions
+                .Where(ud => ud.UserId == userId)
+                .Select(ud => new { ud.UdId, ud.Description })
+                .FirstOrDefaultAsync(); // Используем FirstOrDefault для получения одного элемента
+
+            if (userDescription == null)
+            {
+                return NotFound("Описание пользователя не найдено.");
+            }
+
+            return Ok(userDescription);
+        }
+
+        [HttpPost("updateUserDescription")]
+        public async Task<IActionResult> UpdateUserDescription([FromBody] UserDescription userDescription)
+        {
+            // Проверяем, указаны ли UserId и описание
+            if (userDescription.UserId <= 0 || string.IsNullOrWhiteSpace(userDescription.Description))
+            {
+                return BadRequest("Некорректные данные.");
+            }
+
+            // Проверяем, существует ли пользователь
+            var user = await _context.Datausers.FindAsync(userDescription.UserId);
+            if (user == null)
+            {
+                return NotFound("Пользователь с таким id не существует.");
+            }
+
+            // Получаем и обновляем описание пользователя
+            var existingDescription = await _context.Userdescriptions
+                .FirstOrDefaultAsync(ud => ud.UserId == userDescription.UserId);
+
+            if (existingDescription != null)
+            {
+                existingDescription.Description = userDescription.Description; // Обновляем описание
+            }
+            else
+            {
+                // Получаем максимальный UgId и создаем новую цель
+                var maxUgId = await _context.Userdescriptions.MaxAsync(u => (int?)u.UdId) ?? 0;
+                var newUgId = maxUgId + 1;
+
+                // Если описание не существует, добавляем новое
+                existingDescription = new Userdescription
+                {
+                    UdId = newUgId,
+                    UserId = userDescription.UserId,
+                    Description = userDescription.Description
+                };
+                _context.Userdescriptions.Add(existingDescription);
+            }
+
+            // Сохраняем изменения
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Описание пользователя обновлено." });
+        }
 
 
 
