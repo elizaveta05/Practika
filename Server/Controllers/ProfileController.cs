@@ -138,5 +138,32 @@ namespace Server.Controllers
             return Ok(new { userId = existingUser.UserId });
         }
 
+        [HttpPost("getUserTags")]
+        public async Task<IActionResult> GetUserTags([FromBody] int userId)
+        {
+            // Проверяем, указан ли UserId
+            if (userId <= 0)
+            {
+                return BadRequest("Некорректный идентификатор пользователя.");
+            }
+
+            // Проверяем, существует ли пользователь
+            var userExists = await _context.Datausers.AnyAsync(u => u.UserId == userId);
+            if (!userExists)
+            {
+                return NotFound("Пользователь с таким id не существует.");
+            }
+
+            // Получаем теги пользователя
+            var userTags = await _context.Userinterests
+                .Where(ut => ut.UserId == userId)
+                .Select(ut => ut.TagId) 
+                .ToListAsync();
+
+            return Ok(userTags);
+        }
+
+    
+
     }
 }
