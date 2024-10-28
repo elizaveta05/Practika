@@ -1,4 +1,5 @@
 ﻿using BD.Models;
+using makets.Model.Model_users;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -20,26 +21,39 @@ namespace Server.Controllers
 
         // Вывод информации о пользователе
         [HttpPost("getProfileUser")]
-        public async Task<IActionResult> getProfileUser([FromBody] int userId)
+        public async Task<IActionResult> GetProfileUser([FromBody] int userId)
         {
-            //Проверяем id
-            if (userId.Equals(null))
+            if (userId == 0)
             {
-                return Unauthorized(new { message = "Ошибка!" });
+                return BadRequest(new { message = "Ошибка! Неверный ID пользователя." });
             }
 
-            // Ищем пользователя по логину
-            var user = await _context.Datausers.FirstOrDefaultAsync(u => u.UserId == userId);
+            // Проверяем, существует ли пользователь
+            var userExists = await _context.Datausers.AnyAsync(u => u.UserId == userId);
+            if (!userExists)
+            {
+                return NotFound("Пользователь с таким id не существует");
+            }
 
-            //Проверяем находится ли пользователь
+            var user = await _context.Datausers
+                                     .Include(u => u.Gender)
+                                     .Include(u => u.Location)
+                                     .FirstOrDefaultAsync(u => u.UserId == userId);
+
             if (user == null)
             {
-                return Unauthorized(new { message = "Данные о пользователе не найдены!" });
+                return NotFound(new { message = "Данные о пользователе не найдены!" });
             }
 
-
-            return Ok();
+            return Ok(new UserProfileData
+            {
+                FullName = user.LastName.Trim() + " " + user.FirstName.Trim() +
+                              (string.IsNullOrEmpty(user.Patronymic) ? "" : " " + user.Patronymic.Trim()),
+                Age = DateTime.Now.Year - user.DateOfBirth.Year,
+                City = user.Location.LocationName,
+                Gender = user.Gender.GenderName
+            });
         }
-        
+
     }
 }
