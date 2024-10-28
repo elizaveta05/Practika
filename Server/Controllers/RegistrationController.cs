@@ -9,6 +9,7 @@ using System;
 
 namespace Server.Controllers
 {
+ 
     [Route("api/[controller]")]
     [ApiController]
     public class RegistrationController : ControllerBase
@@ -217,7 +218,8 @@ namespace Server.Controllers
 
             return Ok(new { message = "Описание пользователя сохранено." });
         }
+    
 
-
-    }
+    } 
+  
 }

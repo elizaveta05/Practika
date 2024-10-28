@@ -11,11 +11,13 @@ namespace Server.Controllers
     [ApiController]
     public class AuthorizationController : ControllerBase
     {
+        
         private readonly PracticeDatingAppContext _context;
         public AuthorizationController(PracticeDatingAppContext context)
         {
             _context = context;
         }
+        
 
         // Авторизация пользователя
         [HttpPost("authorization")]
@@ -38,5 +40,6 @@ namespace Server.Controllers
             // Успешная авторизация, возвращаем id пользователя
             return Ok(new { userId = existingUser.UdrId });
         }
+        
     }
 }

@@ -46,4 +46,6 @@ public partial class Datauser
     public virtual ICollection<Userlike> UserlikeLikedUsers { get; set; } = new List<Userlike>();
 
     public virtual ICollection<Userlike> UserlikeUsers { get; set; } = new List<Userlike>();
+
+    public virtual ICollection<Userphotopprofile> Userphotopprofiles { get; set; } = new List<Userphotopprofile>();
 }

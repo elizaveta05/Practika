@@ -10,6 +10,7 @@ namespace Server.Controllers
     [ApiController]
     public class ProfileController : ControllerBase
     {
+        
         private readonly PracticeDatingAppContext _context;
 
         public ProfileController(PracticeDatingAppContext context)
@@ -39,5 +40,6 @@ namespace Server.Controllers
 
             return Ok();
         }
+        
     }
 }

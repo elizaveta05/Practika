@@ -41,6 +41,8 @@ public partial class PracticeDatingAppContext : DbContext
 
     public virtual DbSet<Userlike> Userlikes { get; set; }
 
+    public virtual DbSet<Userphotopprofile> Userphotopprofiles { get; set; }
+
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
 #warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
         => optionsBuilder.UseNpgsql("Host=localhost;Port=5432;Database=Practice_dating_app;Username=postgres;Password=Elizaveta05");
@@ -331,6 +333,22 @@ public partial class PracticeDatingAppContext : DbContext
                 .HasForeignKey(d => d.UserId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("userlikes_user_id_fkey");
+        });
+
+        modelBuilder.Entity<Userphotopprofile>(entity =>
+        {
+            entity.HasKey(e => e.UppId).HasName("userphotopprofile_pkey");
+
+            entity.ToTable("userphotopprofile");
+
+            entity.Property(e => e.UppId).HasColumnName("upp_id");
+            entity.Property(e => e.Photo).HasColumnName("photo");
+            entity.Property(e => e.UserId).HasColumnName("user_id");
+
+            entity.HasOne(d => d.User).WithMany(p => p.Userphotopprofiles)
+                .HasForeignKey(d => d.UserId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("userphotopprofile_user_id_fkey");
         });
 
         OnModelCreatingPartial(modelBuilder);
