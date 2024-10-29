@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Server.Model.Model_users;
 
+
 namespace Server.Controllers
 {
     [Route("api/[controller]")]
@@ -264,7 +265,68 @@ namespace Server.Controllers
             return Ok(new { message = "Описание пользователя обновлено." });
         }
 
+        [HttpPost("postUserPhotoProfile")]
+        public async Task<IActionResult> PostUserPhotoProfile([FromBody] UserPhotoProfile userPhotoProfile)
+        {
+            var user = await _context.Datausers.FindAsync(userPhotoProfile.UserId);
+            if (user == null)
+            {
+                return NotFound("Пользователь с таким id не существует.");
+            }
 
+            if (userPhotoProfile.Photo == null)
+            {
+                return BadRequest("Отсутствует изображение.");
+            }
+
+            var existingPhotoProfile = await _context.Userphotopprofiles
+                .FirstOrDefaultAsync(ud => ud.UserId == userPhotoProfile.UserId);
+
+            if (existingPhotoProfile != null)
+            {
+                existingPhotoProfile.Photo = userPhotoProfile.Photo; // Обновляем изображение
+            }
+            else
+            {
+                var maxUgId = await _context.Userphotopprofiles.MaxAsync(u => (int?)u.UppId) ?? 0;
+                var newUgId = maxUgId + 1;
+
+                var data = new Userphotopprofile
+                {
+                    UppId = newUgId,
+                    UserId = userPhotoProfile.UserId,
+                    Photo = userPhotoProfile.Photo
+                };
+                _context.Userphotopprofiles.Add(data);
+            }
+
+            await _context.SaveChangesAsync();
+
+            // Возвращаем обновленное фото профиля
+            return Ok(userPhotoProfile.Photo);
+        }
+
+        [HttpGet("getUserPhotoProfile/{userId}")]
+        public async Task<IActionResult> GetUserPhotoProfile(int userId)
+        {
+            var user = await _context.Datausers.FindAsync(userId);
+            if (user == null)
+            {
+                return NotFound("Пользователь с таким ID не существует.");
+            }
+
+            var photoProfile = await _context.Userphotopprofiles
+                .FirstOrDefaultAsync(up => up.UserId == userId);
+
+            if (photoProfile == null)
+            {
+                return NotFound("Фотография профиля не найдена."); // Если нет фото, возвращаем 404
+            }
+
+            // Предполагаем, что поле Photo содержит изображение в формате byte[]
+            var base64Image = Convert.ToBase64String(photoProfile.Photo);
+            return Ok(base64Image); // Возвращаем строку в формате Base64
+        }
 
     }
 }
