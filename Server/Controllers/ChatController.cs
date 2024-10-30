@@ -45,7 +45,7 @@ namespace Server.Controllers
                     .Select(u => new
                     {
                         UserId = u.UserId,
-                        Name = $"{u.LastName} {u.FirstName}"
+                        Name = $"{u.LastName.Trim()} {u.FirstName.Trim()}"
                     })
                     .FirstOrDefaultAsync();
 
@@ -69,7 +69,7 @@ namespace Server.Controllers
                 // Форматирование последнего сообщения
                 var lastMessageFormatted = lastMessage != null
                     ? $"{lastMessage.MessageText} ({lastMessage.TimeCreated:dd/MM/yyyy HH:mm})"
-                    : null;
+                    : "Нет сообщений"; // Здесь указываем, что сообщений нет
 
                 // Добавление собранных данных о чате в список
                 chatDetails.Add(new
@@ -81,14 +81,14 @@ namespace Server.Controllers
                         otherUser.Name,
                         ProfilePhoto = profilePhoto
                     },
-                    LastMessage = lastMessageFormatted,
-                    ChatCreated = chat.ChatCreated
+                    LastMessage = lastMessageFormatted
                 });
             }
 
             // Возврат информации о чатах пользователя
             return Ok(chatDetails);
         }
+
 
         // Метод для получения сообщений между пользователем и его собеседником
         [HttpGet("messages/{userId}/{recipientId}")]
