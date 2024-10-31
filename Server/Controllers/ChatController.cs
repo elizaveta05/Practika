@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using makets.Models;
 using BD.Models;
 
 namespace Server.Controllers
@@ -89,19 +90,13 @@ namespace Server.Controllers
             return Ok(chatDetails);
         }
 
-
-        // Метод для получения сообщений между пользователем и его собеседником
-        [HttpGet("messages/{userId}/{recipientId}")]
-        public async Task<ActionResult<IEnumerable<Message>>> GetMessages(int userId, int recipientId, [FromQuery] DateTime? lastTimestamp)
+        // Метод для получения сообщений 
+        [HttpGet("messages/{chatId}")]
+        public async Task<ActionResult<IEnumerable<makets.Models.Message>>> GetMessages(int chatId, [FromQuery] DateTime? lastTimestamp)
         {
-            // Получение идентификатора чата между пользователем и собеседником
-            var chatId = await _context.Chats
-                .Where(c => (c.User1Id == userId && c.User2Id == recipientId) || (c.User1Id == recipientId && c.User2Id == userId))
-                .Select(c => c.ChatId)
-                .FirstOrDefaultAsync();
-
             // Проверка существования чата
-            if (chatId == 0)
+            var chatExists = await _context.Chats.AnyAsync(c => c.ChatId == chatId);
+            if (!chatExists)
             {
                 return NotFound("Чат не найден.");
             }
@@ -109,7 +104,7 @@ namespace Server.Controllers
             // Запрос на получение сообщений из чата
             var query = _context.Messages.Where(m => m.ChatId == chatId);
 
-            // Фильтрация сообщений по времени, если lastTimestamp указан
+            // Фильтрация сообщений по времени, если указан lastTimestamp
             if (lastTimestamp.HasValue)
             {
                 query = query.Where(m => m.TimeCreated > lastTimestamp.Value);
@@ -118,7 +113,7 @@ namespace Server.Controllers
             // Получение и возврат списка сообщений
             var messages = await query
                 .OrderBy(m => m.TimeCreated)
-                .Select(m => new Message
+                .Select(m => new makets.Models.Message
                 {
                     MessageId = m.MessageId,
                     UserSendingId = m.UserSendingId,
@@ -130,9 +125,8 @@ namespace Server.Controllers
             return Ok(messages);
         }
 
-        // Метод для отправки нового сообщения
         [HttpPost("send")]
-        public async Task<ActionResult<Message>> SendMessage([FromBody] Message newMessage)
+        public async Task<ActionResult<makets.Models.Message>> SendMessage([FromBody] makets.Models.Message newMessage)
         {
             // Проверка существования отправителя и чата
             var sender = await _context.Datausers.FindAsync(newMessage.UserSendingId);
@@ -158,13 +152,32 @@ namespace Server.Controllers
                 return BadRequest("Вы не можете отправить сообщение самому себе.");
             }
 
+            // Проверка, что сообщение не пустое
+            if (string.IsNullOrWhiteSpace(newMessage.MessageText))
+            {
+                return BadRequest("Текст сообщения пустое.");
+            }
+
+            // Получаем максимальный id
+            var maxMessageId = await _context.Messages.MaxAsync(u => (int?)u.MessageId) ?? 0;
+            var newMessageId = maxMessageId + 1;
+
+            var message = new BD.Models.Message
+            {
+                MessageId = newMessageId,
+                ChatId = newMessage.ChatId,
+                UserSendingId = newMessage.UserSendingId,
+                MessageText = newMessage.MessageText,
+                TimeCreated = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+            };
+
             // Сохранение нового сообщения в базе данных
-            newMessage.TimeCreated = DateTime.UtcNow; // Установка времени создания сообщения
-            _context.Messages.Add(newMessage);
+            _context.Messages.Add(message);
             await _context.SaveChangesAsync();
 
             // Возврат успешно созданного сообщения
-            return CreatedAtAction(nameof(GetMessages), new { userId = newMessage.UserSendingId, recipientId = (chat.User1Id == newMessage.UserSendingId ? chat.User2Id : chat.User1Id) }, newMessage);
+            return Ok(message);
         }
     }
+
 }
