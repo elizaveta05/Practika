@@ -1,11 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Net.WebSockets;
+using System.Text;
+using System.Threading;
 using makets.Models;
 using BD.Models;
+using Newtonsoft.Json;
 
 namespace Server.Controllers
 {
@@ -14,10 +14,92 @@ namespace Server.Controllers
     public class ChatController : ControllerBase
     {
         private readonly PracticeDatingAppContext _context;
+        private static readonly Dictionary<int, WebSocket> ConnectedUsers = new();
 
         public ChatController(PracticeDatingAppContext context)
         {
             _context = context;
+        }
+
+        // Метод для работы с WebSocket
+        [HttpGet("connect/{userId}")]
+        public async Task<IActionResult> Connect(int userId)
+        {
+            if (HttpContext.WebSockets.IsWebSocketRequest)
+            {
+                var webSocket = await HttpContext.WebSockets.AcceptWebSocketAsync();
+                if (!ConnectedUsers.ContainsKey(userId))
+                {
+                    ConnectedUsers.Add(userId, webSocket);
+                }
+
+                await ReceiveMessages(webSocket, userId);
+                return new EmptyResult();
+            }
+            else
+            {
+                return BadRequest("WebSocket connection expected.");
+            }
+        }
+
+        private async Task ReceiveMessages(WebSocket webSocket, int userId)
+        {
+            var buffer = new byte[1024 * 4];
+            while (webSocket.State == WebSocketState.Open)
+            {
+                var result = await webSocket.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
+                if (result.MessageType == WebSocketMessageType.Close)
+                {
+                    ConnectedUsers.Remove(userId);
+                    await webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closed by the client", CancellationToken.None);
+                }
+            }
+        }
+
+        // Метод для отправки сообщения всем подключенным пользователям
+        [HttpPost("send")]
+        public async Task<ActionResult<makets.Models.Message>> SendMessage([FromBody] makets.Models.Message newMessage)
+        {
+            var sender = await _context.Datausers.FindAsync(newMessage.UserSendingId);
+            var chat = await _context.Chats.FindAsync(newMessage.ChatId);
+
+            if (sender == null || chat == null || string.IsNullOrWhiteSpace(newMessage.MessageText))
+            {
+                return BadRequest("Ошибка при отправке сообщения.");
+            }
+
+            var message = new BD.Models.Message
+            {
+                MessageId = await _context.Messages.MaxAsync(u => (int?)u.MessageId) + 1 ?? 1,
+                ChatId = newMessage.ChatId,
+                UserSendingId = newMessage.UserSendingId,
+                MessageText = newMessage.MessageText,
+                TimeCreated = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
+            };
+
+            _context.Messages.Add(message);
+            await _context.SaveChangesAsync();
+
+            var messageJson = JsonConvert.SerializeObject(new
+            {
+                message.MessageId,
+                message.ChatId,
+                message.UserSendingId,
+                message.MessageText,
+                TimeCreated = message.TimeCreated.ToString("O")
+            });
+
+            var messageBuffer = Encoding.UTF8.GetBytes(messageJson);
+
+            foreach (var (userId, socket) in ConnectedUsers)
+            {
+                if (socket.State == WebSocketState.Open)
+                {
+                    await socket.SendAsync(new ArraySegment<byte>(messageBuffer), WebSocketMessageType.Text, true, CancellationToken.None);
+                }
+            }
+
+            return Ok(message);
         }
 
         // Метод для получения всех чатов пользователя с дополнительной информацией
@@ -125,59 +207,6 @@ namespace Server.Controllers
             return Ok(messages);
         }
 
-        [HttpPost("send")]
-        public async Task<ActionResult<makets.Models.Message>> SendMessage([FromBody] makets.Models.Message newMessage)
-        {
-            // Проверка существования отправителя и чата
-            var sender = await _context.Datausers.FindAsync(newMessage.UserSendingId);
-            var chat = await _context.Chats
-                .Where(c => c.ChatId == newMessage.ChatId)
-                .FirstOrDefaultAsync();
 
-            // Проверка наличия отправителя
-            if (sender == null)
-            {
-                return BadRequest("Отправитель не найден.");
-            }
-
-            // Проверка наличия чата
-            if (chat == null)
-            {
-                return BadRequest("Чат не найден.");
-            }
-
-            // Проверка, не пытается ли пользователь отправить сообщение самому себе
-            if (newMessage.UserSendingId == (chat.User1Id == newMessage.UserSendingId ? chat.User2Id : chat.User1Id))
-            {
-                return BadRequest("Вы не можете отправить сообщение самому себе.");
-            }
-
-            // Проверка, что сообщение не пустое
-            if (string.IsNullOrWhiteSpace(newMessage.MessageText))
-            {
-                return BadRequest("Текст сообщения пустое.");
-            }
-
-            // Получаем максимальный id
-            var maxMessageId = await _context.Messages.MaxAsync(u => (int?)u.MessageId) ?? 0;
-            var newMessageId = maxMessageId + 1;
-
-            var message = new BD.Models.Message
-            {
-                MessageId = newMessageId,
-                ChatId = newMessage.ChatId,
-                UserSendingId = newMessage.UserSendingId,
-                MessageText = newMessage.MessageText,
-                TimeCreated = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
-            };
-
-            // Сохранение нового сообщения в базе данных
-            _context.Messages.Add(message);
-            await _context.SaveChangesAsync();
-
-            // Возврат успешно созданного сообщения
-            return Ok(message);
-        }
     }
-
 }
