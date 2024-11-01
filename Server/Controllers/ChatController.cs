@@ -144,15 +144,17 @@ namespace Server.Controllers
                     .OrderByDescending(m => m.TimeCreated)
                     .Select(m => new
                     {
-                        MessageText = m.MessageText.Length > 10 ? m.MessageText.Substring(0, 10) + "..." : m.MessageText,
-                        m.TimeCreated
+                        m.MessageText,
+                        m.TimeCreated,
+                        m.UserSendingId
                     })
                     .FirstOrDefaultAsync();
 
-                // Форматирование последнего сообщения
                 var lastMessageFormatted = lastMessage != null
-                    ? $"{lastMessage.MessageText} ({lastMessage.TimeCreated:dd/MM/yyyy HH:mm})"
-                    : "Нет сообщений"; // Здесь указываем, что сообщений нет
+                    ? (lastMessage.UserSendingId == userId
+                        ? $"{lastMessage.MessageText} ({lastMessage.TimeCreated:dd/MM/yyyy HH:mm})"
+                        : $"{otherUser.Name}: {lastMessage.MessageText} ({lastMessage.TimeCreated:dd/MM/yyyy HH:mm})")
+                    : "Нет сообщений";
 
                 // Добавление собранных данных о чате в список
                 chatDetails.Add(new
